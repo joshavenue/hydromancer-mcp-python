@@ -34,7 +34,7 @@ dependencies = [
 [project.urls]
 Homepage = "https://docs.hydromancer.xyz"
 Documentation = "https://docs.hydromancer.xyz"
-Repository = "https://github.com/hydromancerxyz/hydromancer-mcp-python"
+Repository = "https://github.com/joshavenue/hydromancer-mcp-python"
 
 [project.scripts]
 hydromancer-mcp = "hydromancer_mcp.server:main"

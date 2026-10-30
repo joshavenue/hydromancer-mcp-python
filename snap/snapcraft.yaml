@@ -29,8 +29,8 @@ description: |
     claude mcp add hydromancer -e HYDROMANCER_API_KEY=YOUR_KEY -- hydromancer-mcp
 license: MIT
 website: https://hydromancer.xyz
-source-code: https://github.com/hydromancerxyz/hydromancer-mcp-python # placeholder: confirm before the first release
-issues: https://github.com/hydromancerxyz/hydromancer-mcp-python/issues # placeholder: confirm before the first release
+source-code: https://github.com/joshavenue/hydromancer-mcp-python
+issues: https://github.com/joshavenue/hydromancer-mcp-python/issues
 contact: https://hydromancer.xyz # placeholder: confirm a support email or page before the first release
 icon: snap/gui/hydromancer-mcp.png
 
