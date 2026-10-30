@@ -28,14 +28,17 @@ def to_text(payload: Any) -> str:
     if len(text) <= cap:
         return text
     # Keep the result valid JSON: the cut-off text goes inside a string with an explicit note.
-    return json.dumps(
-        {
-            "TRUNCATED": f"Result was {len(text)} characters, cut to {cap}. Ask again with a smaller limit, "
-            "a shorter time range, or one coin/address.",
-            "partialResult": text[:cap],
-        },
-        ensure_ascii=False,
+    # Escaping makes the string longer than the slice, so shrink the slice until the whole result fits.
+    note = (
+        f"Result was {len(text)} characters, cut to at most {cap}. Ask again with a smaller limit, "
+        "a shorter time range, or one coin/address."
     )
+    n = cap
+    while True:
+        out = json.dumps({"TRUNCATED": note, "partialResult": text[:n]}, ensure_ascii=False)
+        if len(out) <= cap or n == 0:
+            return out
+        n = max(0, min(n - 1, n - (len(out) - cap)))
 
 
 def num(v: Any) -> float:

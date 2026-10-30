@@ -260,9 +260,17 @@ async def test_large_results_are_truncated(server: Any, monkeypatch: pytest.Monk
     monkeypatch.setenv("HYDROMANCER_MAX_RESULT_CHARS", "500")
     respx.post(API).mock(return_value=httpx.Response(200, json={"blob": "x" * 5000}))
     is_error, text = await call(server, "hydromancer_raw_request", {"body": {"type": "meta"}})
-    assert not is_error and len(text) < 800
+    assert not is_error and len(text) <= 500
     out = json.loads(text)  # still valid JSON
-    assert "cut to 500" in out["TRUNCATED"] and out["partialResult"].startswith("{")
+    assert "cut to at most 500" in out["TRUNCATED"] and out["partialResult"].startswith("{")
+
+
+def test_truncation_fits_cap_even_with_escaping(monkeypatch: pytest.MonkeyPatch) -> None:
+    from hydromancer_mcp.shape import to_text
+
+    monkeypatch.setenv("HYDROMANCER_MAX_RESULT_CHARS", "300")
+    text = to_text({"quotes": ['"\\\n' * 50] * 20})
+    assert len(text) <= 300 and json.loads(text)["TRUNCATED"]
 
 
 @respx.mock
@@ -285,7 +293,7 @@ async def test_closed_trades_median_even_and_cap_note(server: Any) -> None:
     respx.post(API).mock(side_effect=by_type({"userCompletedTradesByTime": trades}))
     out = await call_json(server, "hydromancer_wallet_closed_trades", {"address": WALLET})
     assert out["summary"]["medianHoldMinutes"] == 2
-    assert "500-trade maximum" in out["note"]
+    assert "per-request maximum" in out["note"]
 
 
 async def test_non_finite_time_is_rejected(server: Any) -> None:

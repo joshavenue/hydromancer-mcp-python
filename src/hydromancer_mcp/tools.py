@@ -324,7 +324,7 @@ def register_tools(server: Any, client: HydromancerClient) -> list[str]:
         "hydromancer_wallet_closed_trades",
         "Wallet closed trades (open-to-close round trips)",
         "Completed trades for a wallet: each row is a full position from open to close with entry, exit, size, gross and net "
-        "PnL, fees, funding and how long it was held. The summary covers every trade in the window; rows are newest first."
+        "PnL, fees, funding and how long it was held. The summary covers all trades returned for the window (up to 500); rows are newest first."
         ' Best tool for judging trading skill ("what is this wallet\'s win rate '
         f'and best coin?"). Default window: last 30 days. since/until accept {TIME_DESCRIPTION}',
     )
@@ -368,8 +368,8 @@ def register_tools(server: Any, client: HydromancerClient) -> list[str]:
         }
         if len(fetched) >= CLOSED_TRADES_MAX:
             out["note"] = (
-                f"The API returned its {CLOSED_TRADES_MAX}-trade maximum, the oldest in the window; the summary covers "
-                "only those. Use a shorter window for full totals."
+                f"The API returned {CLOSED_TRADES_MAX} trades, its per-request maximum, so the window may hold more trades "
+                "than the summary includes. Use a shorter window to be sure the totals are complete."
             )
         out["trades"] = [
                 {
@@ -761,7 +761,7 @@ def register_tools(server: Any, client: HydromancerClient) -> list[str]:
     @tool(
         "hydromancer_my_usage",
         "My Hydromancer API usage",
-        "Your own Hydromancer API usage by day and request type: requests, failures, speed and tokens consumed.",
+        "Your own Hydromancer API usage by day and request type: requests, failures, response times and tokens consumed.",
     )
     async def my_usage(days: Annotated[Optional[int], Field(ge=1, le=90, description="Days to look back (default 7).")] = None) -> Obj:
         rows = _rows(await client.info({"type": "apiUsage", "days": days or 7}))
@@ -777,7 +777,7 @@ def register_tools(server: Any, client: HydromancerClient) -> list[str]:
         "Advanced: any Hydromancer API request",
         "Send any Hydromancer /info request directly, for endpoints the other tools do not cover (e.g. vaultSummaries, "
         "historicalOrders, spotMeta, outcomeMeta, delegations, perpDexStatus, userFunding, openInterestHistory). Pass the "
-        'request body as JSON including "type". Full list: https://docs.hydromancer.xyz/llms.txt . Read-only: /info cannot '
+        'request body as JSON including "type". Full list: https://docs.hydromancer.xyz/llms.txt. Read-only: /info cannot '
         "place orders. Binary snapshot endpoints are not supported.",
     )
     async def raw_request(

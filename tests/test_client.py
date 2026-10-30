@@ -209,6 +209,12 @@ async def test_429_without_hints_backs_off(client: HydromancerClient, sleeps: li
     assert [round(s) for s in sleeps] == [1, 2]
 
 
+@respx.mock
+async def test_successful_data_is_not_rewritten(client: HydromancerClient) -> None:
+    respx.post(API).mock(return_value=httpx.Response(200, json={"text": "Bearer shares may trade"}))
+    assert await client.info({"type": "meta"}) == {"text": "Bearer shares may trade"}
+
+
 def test_repr_hides_key(client: HydromancerClient) -> None:
     assert TEST_KEY not in repr(client)
 

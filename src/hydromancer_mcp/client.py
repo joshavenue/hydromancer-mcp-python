@@ -139,8 +139,7 @@ class HydromancerClient:
                 raise HydromancerError(
                     f"Could not reach Hydromancer ({self.mask(type(err).__name__)}). Check the internet connection."
                 ) from None
-            # Mask the whole body before anything else touches it, so no partial key survives truncation.
-            text = self.mask(raw.decode(res.encoding or "utf-8", errors="replace"))
+            text = raw.decode(res.encoding or "utf-8", errors="replace")
             wait = retry_after_seconds(res.headers, text, attempt) if res.status_code == 429 else 0.0
             if res.status_code == 429 and attempt < self.max_retries and wait <= self.max_retry_wait_s:
                 attempt += 1
@@ -150,7 +149,8 @@ class HydromancerClient:
             break
 
         if not res.is_success:
-            raise HydromancerError(self.mask(explain_status(res.status_code, text, kind, wait)), res.status_code)
+            # Mask the whole body before it is shortened, so no partial key survives truncation.
+            raise HydromancerError(self.mask(explain_status(res.status_code, self.mask(text), kind, wait)), res.status_code)
         stripped = text.strip()
         if stripped in ("", "null"):
             return None
