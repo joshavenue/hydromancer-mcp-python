@@ -12,7 +12,7 @@
 
 1. **Company Ubuntu One account.** Create it with a company address (not a personal one) at <https://login.ubuntu.com>. The same account is used for the Snap Store and Launchpad.
 2. **Snap Store developer account.** Sign in at <https://snapcraft.io/account> with that account, accept the developer terms, and set the publisher display name to "Hydromancer".
-3. **snapcraft.** Use the 8.x track, which these steps were written against (Homebrew installs its current snapcraft; check that `snapcraft --version` reports 8.x). Either:
+3. **snapcraft.** These steps were written against snapcraft 8.x. Linux can pin that track; Homebrew installs the current release (9.x at the time of writing), so on macOS check each command against `snapcraft help <command>` if it fails. Either:
    - on macOS, with Multipass as the build provider:
      ```bash
      brew install --cask multipass
