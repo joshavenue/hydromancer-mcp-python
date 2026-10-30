@@ -14,7 +14,8 @@ def max_result_chars() -> int:
         value = int(os.environ.get("HYDROMANCER_MAX_RESULT_CHARS", "40000"))
     except ValueError:
         return 40_000
-    return value if value > 0 else 40_000
+    # A floor of 1,000 leaves room for the truncation note, so a cut result always fits the cap.
+    return max(value, 1_000) if value > 0 else 40_000
 
 
 def page(rows: list[Any], limit: int, offset: int = 0) -> tuple[list[Any], dict[str, Any]]:

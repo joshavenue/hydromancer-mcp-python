@@ -257,20 +257,21 @@ async def test_errors_are_tool_errors_and_masked(server: Any) -> None:
 
 @respx.mock
 async def test_large_results_are_truncated(server: Any, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("HYDROMANCER_MAX_RESULT_CHARS", "500")
+    monkeypatch.setenv("HYDROMANCER_MAX_RESULT_CHARS", "1000")
     respx.post(API).mock(return_value=httpx.Response(200, json={"blob": "x" * 5000}))
     is_error, text = await call(server, "hydromancer_raw_request", {"body": {"type": "meta"}})
-    assert not is_error and len(text) <= 500
+    assert not is_error and len(text) <= 1000
     out = json.loads(text)  # still valid JSON
-    assert "cut to at most 500" in out["TRUNCATED"] and out["partialResult"].startswith("{")
+    assert "cut to at most 1000" in out["TRUNCATED"] and out["partialResult"].startswith("{")
 
 
 def test_truncation_fits_cap_even_with_escaping(monkeypatch: pytest.MonkeyPatch) -> None:
     from hydromancer_mcp.shape import to_text
 
-    monkeypatch.setenv("HYDROMANCER_MAX_RESULT_CHARS", "300")
-    text = to_text({"quotes": ['"\\\n' * 50] * 20})
-    assert len(text) <= 300 and json.loads(text)["TRUNCATED"]
+    for cap in ("1", "100", "1000", "1500"):
+        monkeypatch.setenv("HYDROMANCER_MAX_RESULT_CHARS", cap)
+        text = to_text({"quotes": ['"\\\n' * 50] * 40})
+        assert len(text) <= max(int(cap), 1000) and json.loads(text)["TRUNCATED"]
 
 
 @respx.mock

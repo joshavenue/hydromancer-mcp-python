@@ -132,7 +132,7 @@ The server also provides a `hydromancer_guide` prompt and a `hydromancer://guide
 | `HYDROMANCER_API_KEY` | (required) | Your API key |
 | `HYDROMANCER_BASE_URL` | `https://api.hydromancer.xyz/info` | Set to `https://api-testnet.hydromancer.xyz/info` for testnet; any other host is refused |
 | `HYDROMANCER_TIMEOUT_MS` | `30000` | Request timeout |
-| `HYDROMANCER_MAX_RESULT_CHARS` | `40000` | Cap on one tool result, so the AI is not flooded |
+| `HYDROMANCER_MAX_RESULT_CHARS` | `40000` | Cap on one tool result (minimum 1000), so the AI is not flooded |
 
 ## Security
 
