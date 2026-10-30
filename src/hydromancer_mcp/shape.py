@@ -23,8 +23,22 @@ def page(rows: list[Any], limit: int, offset: int = 0) -> tuple[list[Any], dict[
     return chunk, {"total": len(rows), "offset": offset, "returned": len(chunk), "hasMore": offset + len(chunk) < len(rows)}
 
 
+def _finite(value: Any) -> Any:
+    """Replace NaN/Infinity (which json.loads accepts from an API) with None, so output is strict JSON."""
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    if isinstance(value, dict):
+        return {k: _finite(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_finite(v) for v in value]
+    return value
+
+
 def to_text(payload: Any) -> str:
-    text = json.dumps(payload, indent=1, ensure_ascii=False, default=str)
+    try:
+        text = json.dumps(payload, indent=1, ensure_ascii=False, default=str, allow_nan=False)
+    except ValueError:
+        text = json.dumps(_finite(payload), indent=1, ensure_ascii=False, default=str, allow_nan=False)
     cap = max_result_chars()
     if len(text) <= cap:
         return text

@@ -302,6 +302,13 @@ async def test_non_finite_time_is_rejected(server: Any) -> None:
     assert is_error and "Could not understand the time" in text
 
 
+def test_non_finite_numbers_become_null() -> None:
+    from hydromancer_mcp.shape import to_text
+
+    assert json.loads(to_text({"a": float("nan"), "b": [float("inf"), 1.5], "c": "x"})) == {"a": None, "b": [None, 1.5], "c": "x"}
+    assert to_text(float("-inf")) == "null"
+
+
 def test_snap_version_matches_package() -> None:
     import re
     from pathlib import Path

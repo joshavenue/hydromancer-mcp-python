@@ -22,7 +22,8 @@ description: |
   environment. It contacts only api.hydromancer.xyz (or
   api-testnet.hydromancer.xyz if HYDROMANCER_BASE_URL is set to it), sends the
   key nowhere else and never logs it. The server tells the AI to treat API
-  responses as data, never as instructions.
+  responses as data, never as instructions. This is guidance to the AI, not a
+  guarantee.
 
   Example (Claude Code):
     claude mcp add hydromancer -e HYDROMANCER_API_KEY=YOUR_KEY -- hydromancer-mcp

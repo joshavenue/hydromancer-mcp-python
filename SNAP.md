@@ -5,14 +5,14 @@
 ## What the snap does at runtime
 
 - **Environment.** snapd starts from the caller's environment, adds or replaces the snap runtime variables (`SNAP_*`, `HOME` set to `$SNAP_USER_DATA`, `XDG_RUNTIME_DIR`, `PATH`), overlays the variables set in `snapcraft.yaml`, and strips unsafe loader variables ([snapd source](https://github.com/canonical/snapd/blob/master/snap/snapenv/snapenv.go)). Ordinary custom variables are kept, so `HYDROMANCER_API_KEY`, `HYDROMANCER_BASE_URL` and the other settings passed by an MCP client's `env` block reach the server as set.
-- **Files.** The server writes no files. `PYTHONDONTWRITEBYTECODE=1` stops Python from trying to write `.pyc` files into the read-only snap. Strict confinement would also block writes outside `$SNAP_USER_DATA`.
+- **Files.** The server writes no files. `PYTHONDONTWRITEBYTECODE=1` stops Python from trying to write `.pyc` files into the read-only snap. Strict confinement also limits writes to the snap's own data folders.
 - **Network.** The `network` plug (auto-connected) allows outgoing connections. The server itself only contacts `api.hydromancer.xyz` (or `api-testnet.hydromancer.xyz`), and the code refuses any other host. No other interfaces are requested.
 
 ## One-time setup
 
 1. **Company Ubuntu One account.** Create it with a company address (not a personal one) at <https://login.ubuntu.com>. The same account is used for the Snap Store and Launchpad.
 2. **Snap Store developer account.** Sign in at <https://snapcraft.io/account> with that account, accept the developer terms, and set the publisher display name to "Hydromancer".
-3. **snapcraft.** Use the 8.x track, which these steps were written against. Either:
+3. **snapcraft.** Use the 8.x track, which these steps were written against (Homebrew installs its current snapcraft; check that `snapcraft --version` reports 8.x). Either:
    - on macOS, with Multipass as the build provider:
      ```bash
      brew install --cask multipass
@@ -43,10 +43,11 @@
    ```bash
    sudo snap install --dangerous ./hydromancer-mcp_0.1.0_arm64.snap
    hydromancer-mcp --version
+   # needs the repo checked out and mcp in a venv: python3 -m venv .venv && . .venv/bin/activate && pip install mcp
+   HYDROMANCER_API_KEY=YOUR_KEY python3 scripts/smoke_stdio.py      # uses the installed hydromancer-mcp
+   ls -A ~/snap/hydromancer-mcp/current/                              # should print nothing: the server wrote no files
    HYDROMANCER_API_KEY=test-value snap run --shell hydromancer-mcp   # opens a shell inside the snap's environment
    env | grep HYDROMANCER_API_KEY; exit                               # should print test-value
-   HYDROMANCER_API_KEY=YOUR_KEY python3 scripts/smoke_stdio.py    # needs `pip install mcp`; uses the installed hydromancer-mcp
-   ls ~/snap/hydromancer-mcp/current/                               # should be empty: nothing written
    ```
 4. **Upload and release:**
    ```bash
