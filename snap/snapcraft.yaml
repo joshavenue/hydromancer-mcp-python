@@ -10,17 +10,19 @@ description: |
   Hyperliquid wallets, top traders, markets, funding and liquidations, using
   the Hydromancer API.
 
-  - 12 read-only tools: wallets, trades, top traders, markets, funding,
-    order book depth, liquidations, your API usage and a raw request tool
+  - 12 read-only tools: wallets, trades, top traders, markets, price
+    history, funding, order book depth, liquidations, your API usage and a
+    raw request tool
   - Friendly inputs: coin names in any case ($ETH, ETH-PERP, xyz:tsla) and
     times such as 24h, 7d or 2026-10-01
-  - It cannot place, cancel or sign orders and never handles funds or keys
+  - It cannot place, cancel or sign orders and never handles funds or
+    private keys
 
   The server speaks MCP over stdio and reads HYDROMANCER_API_KEY from its
   environment. It contacts only api.hydromancer.xyz (or
   api-testnet.hydromancer.xyz if HYDROMANCER_BASE_URL is set to it), sends the
-  key nowhere else and never logs it. API responses are returned to the AI as
-  data, never as instructions.
+  key nowhere else and never logs it. The server tells the AI to treat API
+  responses as data, never as instructions.
 
   Example (Claude Code):
     claude mcp add hydromancer -e HYDROMANCER_API_KEY=YOUR_KEY -- hydromancer-mcp
@@ -48,10 +50,14 @@ apps:
       # The snap is read-only; don't try to write .pyc files at runtime.
       PYTHONDONTWRITEBYTECODE: "1"
 
+lint:
+  ignore:
+    - metadata:
+        - donation # no donation link for a company package
+
 parts:
   hydromancer-mcp:
+    # Uses core24's Python 3.12; the plugin creates a venv and runs `pip install .` (hatchling).
     plugin: python
     source: .
     source-type: local
-    stage-packages:
-      - python3-venv
