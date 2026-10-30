@@ -1,0 +1,72 @@
+# Builds and tests the snap on amd64 and arm64, and uploads it to the Snap Store on request.
+# Uploading needs a store credential limited to this snap, in the
+# SNAPCRAFT_STORE_CREDENTIALS repository secret (see SNAP.md).
+name: snap
+
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: "Snap Store channel to release to (none = build and test only)"
+        type: choice
+        default: none
+        options: [none, edge, stable]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: snapcore/action-build@v1
+        id: build
+      - name: Test the snap
+        env:
+          SNAP_FILE: ${{ steps.build.outputs.snap }}
+        run: |
+          sudo snap install --dangerous "$SNAP_FILE"
+          /snap/bin/hydromancer-mcp --version
+          (
+            printf '%s\n' \
+              '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"0"}}}' \
+              '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
+              '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
+            sleep 10
+          ) | HYDROMANCER_API_KEY=placeholder /snap/bin/hydromancer-mcp | cat > responses.jsonl
+          python3 -c "
+          import json
+          tools = [json.loads(line) for line in open('responses.jsonl')][-1]['result']['tools']
+          assert len(tools) == 12, len(tools)
+          print(len(tools), 'tools')
+          "
+      - uses: actions/upload-artifact@v4
+        with:
+          name: snap-${{ matrix.runner }}
+          path: ${{ steps.build.outputs.snap }}
+          if-no-files-found: error
+
+  publish:
+    if: inputs.channel != 'none'
+    needs: build
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: snap-${{ matrix.runner }}
+      - id: file
+        run: echo "snap=$(ls ./*.snap)" >> "$GITHUB_OUTPUT"
+      - uses: snapcore/action-publish@v1
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+        with:
+          snap: ${{ steps.file.outputs.snap }}
+          release: ${{ inputs.channel }}

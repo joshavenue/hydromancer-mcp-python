@@ -31,7 +31,7 @@ license: MIT
 website: https://hydromancer.xyz
 source-code: https://github.com/joshavenue/hydromancer-mcp-python
 issues: https://github.com/joshavenue/hydromancer-mcp-python/issues
-contact: https://hydromancer.xyz # placeholder: confirm a support email or page before the first release
+contact: mailto:data@hydromancer.xyz
 icon: snap/gui/hydromancer-mcp.png
 
 base: core24

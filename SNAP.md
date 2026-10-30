@@ -11,7 +11,7 @@
 ## One-time setup
 
 1. **Company Ubuntu One account.** Create it with a company address (not a personal one) at <https://login.ubuntu.com>. The same account is used for the Snap Store and Launchpad.
-2. **Snap Store developer account.** Sign in at <https://snapcraft.io/account> with that account, accept the developer terms, and set the publisher display name to "Hydromancer".
+2. **Snap Store developer account.** Sign in at <https://snapcraft.io/account> with that account, accept the developer terms, and set the publisher display name to "JoJo-Hydromancer".
 3. **snapcraft.** These steps were written against snapcraft 8.x. Linux can pin that track; Homebrew installs the current release (9.x at the time of writing), so on macOS check each command against `snapcraft help <command>` if it fails. Either:
    - on macOS, with Multipass as the build provider:
      ```bash
@@ -29,7 +29,7 @@
    snapcraft login
    snapcraft register hydromancer-mcp
    ```
-5. **Store listing.** At <https://snapcraft.io/hydromancer-mcp/listing>, check the title, summary, description and icon (taken from `snapcraft.yaml` on first upload), set the category to "Development", and fill in the contact, issues and source-code links. These are placeholders in `snapcraft.yaml` until the public repository exists.
+5. **Store listing.** At <https://snapcraft.io/hydromancer-mcp/listing>, check the title, summary, description and icon (taken from `snapcraft.yaml` on first upload), set the category to "Development", and check the contact, issues and source-code links.
 
 ## Each release
 
@@ -65,12 +65,14 @@ claude mcp add hydromancer -e HYDROMANCER_API_KEY=YOUR_KEY -- hydromancer-mcp
 
 In JSON or TOML configs (Cursor, Codex), use `"command": "/snap/bin/hydromancer-mcp"` with no `args`, plus the same `env` block as in the README.
 
-## Optional: publish from CI
+## Publish from CI
 
-To publish from GitHub Actions instead of a workstation, create a store credential limited to this snap:
+`.github/workflows/snap.yml` builds and tests the snap on amd64 and arm64 when run by hand (Actions > snap > Run workflow). With channel `none` it stops there and keeps both `.snap` files as run artifacts; with `edge` or `stable` it also uploads them to the Snap Store.
+
+Uploading needs a store credential limited to this snap:
 
 ```bash
 snapcraft export-login --snaps hydromancer-mcp --acls package_access,package_push,package_update,package_release --channels stable,edge -
 ```
 
-Then store it as the `SNAPCRAFT_STORE_CREDENTIALS` repository secret and use `snapcore/action-build` and `snapcore/action-publish`.
+Store it as the `SNAPCRAFT_STORE_CREDENTIALS` repository secret.
