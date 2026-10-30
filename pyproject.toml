@@ -1,0 +1,62 @@
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "hydromancer-mcp"
+dynamic = ["version"]
+description = "Read-only MCP server for the Hydromancer Hyperliquid API: wallets, top traders, markets, funding and liquidations"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Hydromancer BV" }]
+keywords = ["mcp", "model-context-protocol", "hyperliquid", "hydromancer", "trading-data", "ai-tools"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Office/Business :: Financial :: Investment",
+  "Typing :: Typed",
+]
+dependencies = [
+  "mcp>=1.26,<3",
+  "httpx>=0.27.1,<1",
+  "pydantic>=2.11,<3",
+]
+
+[project.urls]
+Homepage = "https://docs.hydromancer.xyz"
+Documentation = "https://docs.hydromancer.xyz"
+Repository = "https://github.com/hydromancerxyz/hydromancer-mcp-python"
+
+[project.scripts]
+hydromancer-mcp = "hydromancer_mcp.server:main"
+
+[dependency-groups]
+dev = [
+  "pytest>=8",
+  "pytest-asyncio>=0.24",
+  "respx>=0.22",
+]
+
+[tool.hatch.version]
+path = "src/hydromancer_mcp/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/hydromancer_mcp"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/hydromancer_mcp", "tests", "scripts/smoke_stdio.py", "README.md", "LICENSE", "pyproject.toml"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+markers = ["live: calls the real Hydromancer API (opt in with HYDROMANCER_LIVE=1)"]
