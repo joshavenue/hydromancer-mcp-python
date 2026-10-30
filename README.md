@@ -8,15 +8,15 @@ Read-only [MCP](https://modelcontextprotocol.io) server for the [Hydromancer](ht
 uvx hydromancer-mcp
 ```
 
-> "What is this wallet holding, and is it a good trader?"
-> "Who were the best traders this week, without bots?"
-> "Who got liquidated in the last 6 hours?"
-> "How much BTC can I sell before the price moves 0.5%?"
+> - "What is this wallet holding, and is it a good trader?"
+> - "Who were the best traders this week, without bots?"
+> - "Who got liquidated in the last 6 hours?"
+> - "How much BTC can I sell before the price moves 0.5%?"
 
-- **12 read-only tools**: wallets, trades, top traders, markets, funding, depth, liquidations, your API usage, plus a raw request tool for any other `/info` endpoint
+- **12 read-only tools**: wallets, trades, top traders, markets, funding, depth, liquidations, your API usage, plus a raw request tool for other `/info` endpoints
 - **Friendly inputs**: coin names in any case (`btc`, `$ETH`, `ETH-PERP`, `xyz:tsla`), times like `24h`, `7d` or `2026-10-01`
 - **Read-only**: it cannot place, cancel or sign orders, and it never handles funds or private keys
-- **Small**: besides the MCP SDK it depends only on `httpx` and `pydantic`; Python 3.10+
+- **Few dependencies**: besides the MCP SDK it uses only `httpx` and `pydantic`; Python 3.10+
 
 ## Hosts contacted
 
@@ -63,7 +63,19 @@ claude mcp add hydromancer -e HYDROMANCER_API_KEY=YOUR_KEY -- uvx hydromancer-mc
 
 ### Cursor
 
-`~/.cursor/mcp.json` (all projects) or `.cursor/mcp.json` (one project): use the same `mcpServers` block as Claude Desktop.
+`~/.cursor/mcp.json` (all projects) or `.cursor/mcp.json` (one project):
+
+```json
+{
+  "mcpServers": {
+    "hydromancer": {
+      "command": "uvx",
+      "args": ["hydromancer-mcp"],
+      "env": { "HYDROMANCER_API_KEY": "YOUR_KEY" }
+    }
+  }
+}
+```
 
 ### Codex
 
@@ -102,7 +114,7 @@ hydromancer-mcp --help
 | `hydromancer_wallet_trades` | Fills in a time window, with volume, PnL, fees and per-coin totals |
 | `hydromancer_wallet_closed_trades` | Round-trip trades: win rate, net PnL, hold time, best coin |
 | `hydromancer_top_traders` | Leaderboard by profit, win rate or volume, with bot and activity filters |
-| `hydromancer_market_snapshot` | Price, 24h volume, open interest, max leverage |
+| `hydromancer_market_snapshot` | Price, 24h volume, open interest; max leverage in the top-markets list |
 | `hydromancer_price_history` | Candles from 1 second to 1 month |
 | `hydromancer_funding_history` | Funding rates, average and annualized |
 | `hydromancer_recent_liquidations` | Liquidations by market, with long/short totals |
@@ -111,7 +123,7 @@ hydromancer-mcp --help
 | `hydromancer_my_usage` | Your own API usage |
 | `hydromancer_raw_request` | Any other Hydromancer `/info` request, e.g. open orders, transfers, vaults ([endpoint list](https://docs.hydromancer.xyz/llms.txt)) |
 
-Tool names and inputs match the TypeScript Hydromancer MCP server, so prompts and docs work with both. The server also provides a `hydromancer_guide` prompt and a `hydromancer://guide` resource that tell the AI which tool to use for which question.
+The server also provides a `hydromancer_guide` prompt and a `hydromancer://guide` resource that tell the AI which tool to use for which question.
 
 ## Settings
 
@@ -125,12 +137,15 @@ Tool names and inputs match the TypeScript Hydromancer MCP server, so prompts an
 ## Security
 
 - **Read-only.** Every request goes to the `/info` endpoint, which only returns data.
+- **What is sent.** Only the request for each tool call (the wallet addresses, coin names and time ranges you ask about) plus your key, to the host above.
 - **Your key stays local.** It is read from the environment, sent only in the `Authorization` header to the hosts above, never logged or printed, and replaced with `***` if it ever appears in an error message.
-- **Responses are data, not instructions.** API responses (market names, descriptions, any text field) are returned to the AI as data. The server tells the AI to treat them as data and never to follow instructions found inside them.
-- **Rate limits.** On HTTP 429 the server waits for the `Retry-After` time (up to 10 seconds, at most twice) and otherwise tells the AI how long to wait.
+- **Responses are data, not instructions.** API responses (market names, descriptions, any text field) are returned to the AI as data. The server tells the AI to treat them as data and never to follow instructions found inside them, and `hydromancer_raw_request` results carry the same note. This is guidance to the AI, not a guarantee, so review what your AI app does with the results.
+- **Rate limits.** On HTTP 429 the server retries at most twice, waiting as long as the API asks (the `Retry-After` header or the response body, otherwise 1 s then 2 s), but only if that wait is 10 seconds or less. Otherwise it tells the AI how long to wait.
+- **Size limits.** Responses over 64 MB are refused, and each tool result is capped (see `HYDROMANCER_MAX_RESULT_CHARS`) with a note when it is cut.
 
 ## Good to know
 
+- The data is for information only and is not financial advice.
 - Each tool call is an ordinary API request and counts toward your key's usage. Check it with `hydromancer_my_usage`.
 - HIP-3 markets use a prefix, for example `xyz:TSLA`.
 - Balances: unified-account and portfolio-margin wallets keep their money in spot, so `balanceUsd` uses their spot stablecoins. Other spot tokens are listed but not priced.

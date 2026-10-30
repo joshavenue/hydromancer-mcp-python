@@ -1,0 +1,58 @@
+# Publishes to PyPI with Trusted Publishing (no API token stored in GitHub).
+# One-time setup on PyPI: add a (pending) GitHub publisher with this repository,
+# workflow file "release.yml" and environment "pypi".
+name: release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.10", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - run: uv run pytest
+
+  test-mcp-v1:
+    # The lowest supported versions: mcp 1.x (FastMCP), httpx 0.27.1, pydantic 2.11 on Python 3.10.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.10"
+      - run: uv venv && uv pip install --resolution lowest-direct -e . "pytest>=8" "pytest-asyncio>=0.24" "respx>=0.22"
+      - run: .venv/bin/python -m pytest
+
+  build:
+    needs: [test, test-mcp-v1]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv build
+      - run: uvx twine check --strict dist/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1

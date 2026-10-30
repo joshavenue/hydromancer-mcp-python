@@ -49,10 +49,13 @@ dev = [
 [tool.hatch.version]
 path = "src/hydromancer_mcp/__init__.py"
 
+# Metadata 2.4 is the newest core-metadata version PyPI is known to accept.
 [tool.hatch.build.targets.wheel]
 packages = ["src/hydromancer_mcp"]
+core-metadata-version = "2.4"
 
 [tool.hatch.build.targets.sdist]
+core-metadata-version = "2.4"
 include = ["src/hydromancer_mcp", "tests", "scripts/smoke_stdio.py", "README.md", "LICENSE", "pyproject.toml"]
 
 [tool.pytest.ini_options]

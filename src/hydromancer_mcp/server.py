@@ -28,7 +28,7 @@ GUIDE_MD = """# Hydromancer MCP: which tool to use
 |---|---|
 | What is this wallet holding? Is it a good trader? | hydromancer_wallet_overview |
 | What did this wallet trade today / this week? | hydromancer_wallet_trades |
-| Win rate, best coin, average hold time | hydromancer_wallet_closed_trades |
+| Win rate, best coin, median hold time | hydromancer_wallet_closed_trades |
 | Best traders this week/month, without bots | hydromancer_top_traders |
 | Price, volume, open interest now | hydromancer_market_snapshot |
 | Price chart data | hydromancer_price_history |
@@ -40,7 +40,7 @@ GUIDE_MD = """# Hydromancer MCP: which tool to use
 | Anything else in the API (open orders, transfers, funding paid, open interest history, vaults...) | hydromancer_raw_request |
 
 Recipes
-- Find traders worth following: hydromancer_top_traders (period 30d) -> hydromancer_wallet_overview on the top few.
+- Shortlist top traders: hydromancer_top_traders (period 30d) -> hydromancer_wallet_overview on the top few.
 - Judge a trader: hydromancer_wallet_overview -> hydromancer_wallet_closed_trades (since 90d).
 - Market mood: hydromancer_market_snapshot -> hydromancer_funding_history -> hydromancer_recent_liquidations.
 

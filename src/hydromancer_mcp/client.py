@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import math
 import os
 import random
 import re
@@ -25,6 +26,9 @@ ALLOWED_HOSTS = frozenset({"api.hydromancer.xyz", "api-testnet.hydromancer.xyz"}
 # Cloudflare in front of the API rejects default library user agents (403, error code 1010).
 USER_AGENT = f"hydromancer-mcp-py/{__version__} (+https://docs.hydromancer.xyz)"
 KEY_HELP = "https://docs.hydromancer.xyz/readme/get-api-keys"
+# Responses are buffered before parsing; refuse anything larger so a huge raw response cannot exhaust memory.
+MAX_RESPONSE_BYTES = 64 * 1024 * 1024
+_BEARER = re.compile(r"(?i)bearer\s+[A-Za-z0-9._~+/=-]+")
 
 
 class HydromancerError(Exception):
@@ -40,7 +44,11 @@ def resolve_base_url(raw: str | None) -> str:
         return DEFAULT_BASE_URL
     url = raw.strip()
     parts = urlsplit(url)
-    if parts.scheme != "https" or parts.hostname not in ALLOWED_HOSTS or parts.port not in (None, 443):
+    try:
+        port = parts.port
+    except ValueError:
+        port = -1  # malformed port
+    if parts.scheme != "https" or parts.hostname not in ALLOWED_HOSTS or port not in (None, 443):
         raise HydromancerError(
             "HYDROMANCER_BASE_URL must be https://api.hydromancer.xyz/info or "
             "https://api-testnet.hydromancer.xyz/info. Other hosts are refused so your API key stays private."
@@ -71,6 +79,7 @@ class HydromancerClient:
         timeout_s: float | None = None,
         max_retries: int = 2,
         max_retry_wait_s: float = 10.0,
+        max_response_bytes: int = MAX_RESPONSE_BYTES,
     ) -> None:
         key = api_key if api_key is not None else os.environ.get("HYDROMANCER_API_KEY", "")
         self._api_key = key.strip()
@@ -78,6 +87,7 @@ class HydromancerClient:
         self.timeout_s = timeout_s if timeout_s is not None else _env_float("HYDROMANCER_TIMEOUT_MS", 30_000) / 1000
         self.max_retries = max_retries
         self.max_retry_wait_s = max_retry_wait_s
+        self.max_response_bytes = max_response_bytes
         self._http: httpx.AsyncClient | None = None
 
     def __repr__(self) -> str:  # never show the key
@@ -87,10 +97,10 @@ class HydromancerClient:
         return bool(self._api_key)
 
     def mask(self, text: str) -> str:
-        """Remove the API key from any text that might be shown to the user or a model."""
-        if self._api_key and self._api_key in text:
+        """Remove the API key (and any bearer token) from text that might be shown to the user or a model."""
+        if self._api_key:
             text = text.replace(self._api_key, "***")
-        return text
+        return _BEARER.sub("Bearer ***", text)
 
     def _client(self) -> httpx.AsyncClient:
         if self._http is None or self._http.is_closed:
@@ -120,7 +130,7 @@ class HydromancerClient:
         attempt = 0
         while True:
             try:
-                res = await self._client().post(self.base_url, json=clean, headers=headers)
+                res, raw = await self._post(clean, headers, kind)
             except httpx.TimeoutException:
                 raise HydromancerError(
                     f"Hydromancer did not answer within {self.timeout_s:g}s. Try a shorter time range or a smaller limit."
@@ -129,17 +139,18 @@ class HydromancerClient:
                 raise HydromancerError(
                     f"Could not reach Hydromancer ({self.mask(type(err).__name__)}). Check the internet connection."
                 ) from None
-            if res.status_code == 429 and attempt < self.max_retries:
-                wait = retry_after_seconds(res, attempt)
-                if wait <= self.max_retry_wait_s:
-                    attempt += 1
-                    await asyncio.sleep(wait + random.uniform(0, 0.25))
-                    continue
+            # Mask the whole body before anything else touches it, so no partial key survives truncation.
+            text = self.mask(raw.decode(res.encoding or "utf-8", errors="replace"))
+            wait = retry_after_seconds(res.headers, text, attempt) if res.status_code == 429 else 0.0
+            if res.status_code == 429 and attempt < self.max_retries and wait <= self.max_retry_wait_s:
+                attempt += 1
+                jitter = random.uniform(0, min(0.25, self.max_retry_wait_s - wait))
+                await asyncio.sleep(wait + jitter)
+                continue
             break
 
-        text = res.text
         if not res.is_success:
-            raise HydromancerError(self.mask(explain_status(res, text, kind)), res.status_code)
+            raise HydromancerError(self.mask(explain_status(res.status_code, text, kind, wait)), res.status_code)
         stripped = text.strip()
         if stripped in ("", "null"):
             return None
@@ -151,37 +162,51 @@ class HydromancerClient:
                 "are not supported by this server."
             ) from None
 
+    async def _post(self, body: dict[str, Any], headers: dict[str, str], kind: str) -> tuple[httpx.Response, bytes]:
+        async with self._client().stream("POST", self.base_url, json=body, headers=headers) as res:
+            chunks: list[bytes] = []
+            size = 0
+            async for chunk in res.aiter_bytes():
+                size += len(chunk)
+                if size > self.max_response_bytes:
+                    raise HydromancerError(
+                        f'The response for "{kind}" is larger than {self.max_response_bytes // (1024 * 1024)} MB. '
+                        "Ask for a shorter time range, fewer rows or one coin/address."
+                    )
+                chunks.append(chunk)
+            return res, b"".join(chunks)
 
-def retry_after_seconds(res: httpx.Response, attempt: int) -> float:
+
+def retry_after_seconds(headers: httpx.Headers, text: str, attempt: int) -> float:
     """Seconds to wait after a 429: Retry-After (seconds or HTTP date), then body retryAfterSecs, then backoff."""
-    header = res.headers.get("Retry-After")
+    header = headers.get("Retry-After")
     if header:
         try:
-            return max(0.0, float(header))
+            secs = float(header)
+            if math.isfinite(secs):
+                return max(0.0, secs)
         except ValueError:
             try:
                 return max(0.0, parsedate_to_datetime(header).timestamp() - time.time())
             except (TypeError, ValueError):
                 pass
     try:
-        secs = json.loads(res.text).get("retryAfterSecs")
-        if secs is not None:
+        secs = json.loads(text).get("retryAfterSecs")
+        if secs is not None and math.isfinite(float(secs)):
             return max(0.0, float(secs))
     except (ValueError, AttributeError, TypeError):
         pass
     return min(30.0, 2.0**attempt)
 
 
-def explain_status(res: httpx.Response, text: str, kind: str) -> str:
-    status = res.status_code
+def explain_status(status: int, text: str, kind: str, wait: float = 0.0) -> str:
     detail = re.sub(r"\s+", " ", text).strip()[:300]
     if status in (401, 403):
         return (
-            f'Hydromancer refused the API key (HTTP {status}). The key may be wrong, expired, or not allowed to use "{kind}" '
-            f"(some endpoints are paid add-ons). Server said: {detail}"
+            f'Hydromancer refused the API key (HTTP {status}). The key may be wrong, expired, or not enabled for "{kind}". '
+            f"Server said: {detail}"
         )
     if status == 429:
-        wait = retry_after_seconds(res, 0)
         return (
             f"Rate limit reached (HTTP 429). Wait about {wait:.0f}s and try again, or ask for less data. Server said: {detail}"
         )

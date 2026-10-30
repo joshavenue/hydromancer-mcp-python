@@ -44,13 +44,11 @@ class CoinResolver:
         return names
 
     async def resolve(self, raw: str) -> str:
-        """Resolve one user-typed coin to the exact market name. Unknown names pass through trimmed."""
+        """Resolve one user-typed coin to the exact market name. Unknown names pass through trimmed.
+        API errors (bad key, rate limit, network) propagate so the user sees the real cause."""
         if not raw:
             return raw
-        try:
-            names = await self._market_names()
-        except Exception:
-            return raw.strip()
+        names = await self._market_names()
         for c in candidates(raw):
             hit = names.get(c.lower())
             if hit:

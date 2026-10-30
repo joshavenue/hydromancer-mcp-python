@@ -25,13 +25,17 @@ def page(rows: list[Any], limit: int, offset: int = 0) -> tuple[list[Any], dict[
 def to_text(payload: Any) -> str:
     text = json.dumps(payload, indent=1, ensure_ascii=False, default=str)
     cap = max_result_chars()
-    if len(text) > cap:
-        text = (
-            text[:cap]
-            + f"\n...[TRUNCATED: result was {len(text)} characters, cut to {cap}. Ask again with a smaller limit, "
-            "a shorter time range, or one coin/address.]"
-        )
-    return text
+    if len(text) <= cap:
+        return text
+    # Keep the result valid JSON: the cut-off text goes inside a string with an explicit note.
+    return json.dumps(
+        {
+            "TRUNCATED": f"Result was {len(text)} characters, cut to {cap}. Ask again with a smaller limit, "
+            "a shorter time range, or one coin/address.",
+            "partialResult": text[:cap],
+        },
+        ensure_ascii=False,
+    )
 
 
 def num(v: Any) -> float:

@@ -8,6 +8,7 @@ every time argument accepts:
 
 from __future__ import annotations
 
+import math
 import re
 import time
 from datetime import datetime, timezone
@@ -35,6 +36,8 @@ def parse_time(value: str | int | float | None, now: int | None = None) -> int |
     if isinstance(value, bool):
         raise ValueError(f'Could not understand the time "{value}".')
     if isinstance(value, (int, float)):
+        if not math.isfinite(value) or not 0 <= value < 1e14:
+            raise ValueError(f'Could not understand the time "{value}". Use Unix seconds or milliseconds.')
         return _normalise_epoch(value)
     now = now_ms() if now is None else now
     raw = str(value).strip()

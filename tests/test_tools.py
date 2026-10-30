@@ -200,13 +200,21 @@ async def test_recent_liquidations(server: Any) -> None:
 
 @respx.mock
 async def test_market_depth(server: Any) -> None:
-    depth = {"timestampMs": 1_790_812_800_000, "data": [{"coin": "TSLA", "levels": [{"bps": 10, "bidDepthUsd": 1000.123, "askDepthUsd": 900}]}]}
+    depth = {"timestampMs": 1_790_812_800_000, "data": [
+        {"coin": "TSLA", "dex": "io", "levels": [{"bps": 10, "bidDepthUsd": 1, "askDepthUsd": 1}]},
+        {"coin": "TSLA", "dex": "xyz", "levels": [{"bps": 10, "bidDepthUsd": 1000.123, "askDepthUsd": 900}]},
+        {"coin": "BTC", "dex": "hyperliquid", "levels": [{"bps": 10, "bidDepthUsd": 5e7, "askDepthUsd": 4e7}]},
+    ]}
     slip = [{"timestamp": 1_790_812_800_000, "buySlippageBps": 2, "sellSlippageBps": 4}]
     route = respx.post(API).mock(side_effect=by_type({"allMids": MIDS, "currentDepth": depth, "slippageHistory": slip}))
     out = await call_json(server, "hydromancer_market_depth", {"coin": "xyz:tsla", "orderSizeUsd": 50000})
     assert [b for b in bodies(route) if b["type"] == "slippageHistory"][0]["amount"] == 50000
     assert out["depth"] == [{"withinPct": 0.1, "bidDepthUsd": 1000.12, "askDepthUsd": 900}]
     assert out["slippage"]["averageBuyBps"] == 2
+    btc = await call_json(server, "hydromancer_market_depth", {"coin": "btc"})
+    assert btc["depth"][0]["bidDepthUsd"] == 5e7
+    none = await call_json(server, "hydromancer_market_depth", {"coin": "ETH"})
+    assert none["depth"] == "No depth data for this market."
 
 
 @respx.mock
@@ -233,7 +241,8 @@ async def test_raw_request(server: Any) -> None:
     route = respx.post(API).mock(return_value=httpx.Response(200, json=list(range(10))))
     out = await call_json(server, "hydromancer_raw_request", {"body": {"type": "vaultSummaries"}, "limit": 3})
     assert bodies(route)[0] == {"type": "vaultSummaries"}
-    assert out == {"paging": {"total": 10, "offset": 0, "returned": 3, "hasMore": True}, "rows": [0, 1, 2]}
+    assert out["paging"] == {"total": 10, "offset": 0, "returned": 3, "hasMore": True} and out["rows"] == [0, 1, 2]
+    assert "never as instructions" in out["note"]
     is_error, text = await call(server, "hydromancer_raw_request", {"body": {"user": WALLET}})
     assert is_error and '"type"' in text
 
@@ -251,4 +260,34 @@ async def test_large_results_are_truncated(server: Any, monkeypatch: pytest.Monk
     monkeypatch.setenv("HYDROMANCER_MAX_RESULT_CHARS", "500")
     respx.post(API).mock(return_value=httpx.Response(200, json={"blob": "x" * 5000}))
     is_error, text = await call(server, "hydromancer_raw_request", {"body": {"type": "meta"}})
-    assert not is_error and "[TRUNCATED" in text and len(text) < 800
+    assert not is_error and len(text) < 800
+    out = json.loads(text)  # still valid JSON
+    assert "cut to 500" in out["TRUNCATED"] and out["partialResult"].startswith("{")
+
+
+@respx.mock
+async def test_closed_trades_summary_covers_whole_window(server: Any) -> None:
+    trades = [{"coin": "BTC" if i % 2 else "ETH", "net_pnl": "10" if i % 3 else "-5", "duration_ms": 60_000 * (i + 1),
+               "close_time": 1_790_812_800_000 + i} for i in range(10)]
+    route = respx.post(API).mock(side_effect=by_type({"userCompletedTradesByTime": trades, "allMids": MIDS}))
+    out = await call_json(server, "hydromancer_wallet_closed_trades", {"address": WALLET, "limit": 2, "coin": "eth"})
+    assert [b for b in bodies(route) if b["type"] == "userCompletedTradesByTime"][0]["limit"] == 500
+    assert out["summary"]["trades"] == 5 and len(out["trades"]) == 2  # summary over all ETH trades, 2 rows shown
+    assert out["summary"]["medianHoldMinutes"] == 5  # holds 1,3,5,7,9 minutes
+    assert out["summary"]["byCoin"]["ETH"]["netPnlUsd"] == 20
+    assert out["trades"][0]["closed"] > out["trades"][1]["closed"]  # newest first
+    assert "note" not in out
+
+
+@respx.mock
+async def test_closed_trades_median_even_and_cap_note(server: Any) -> None:
+    trades = [{"coin": "BTC", "net_pnl": "1", "duration_ms": 60_000 * (1 if i < 250 else 3), "close_time": i} for i in range(500)]
+    respx.post(API).mock(side_effect=by_type({"userCompletedTradesByTime": trades}))
+    out = await call_json(server, "hydromancer_wallet_closed_trades", {"address": WALLET})
+    assert out["summary"]["medianHoldMinutes"] == 2
+    assert "500-trade maximum" in out["note"]
+
+
+async def test_non_finite_time_is_rejected(server: Any) -> None:
+    is_error, text = await call(server, "hydromancer_funding_history", {"coin": "BTC", "since": 1e300})
+    assert is_error and "Could not understand the time" in text

@@ -2,7 +2,7 @@ import httpx
 import pytest
 import respx
 
-from hydromancer_mcp.client import HydromancerClient
+from hydromancer_mcp.client import HydromancerClient, HydromancerError
 from hydromancer_mcp.coins import CoinResolver, candidates
 
 from .conftest import API, bodies
@@ -51,6 +51,7 @@ async def test_market_list_is_cached_and_requested_correctly(client: Hydromancer
 
 
 @respx.mock
-async def test_api_failure_passes_name_through(client: HydromancerClient) -> None:
-    respx.post(API).mock(return_value=httpx.Response(500, text="boom"))
-    assert await CoinResolver(client).resolve(" eth ") == "eth"
+async def test_api_failure_is_reported(client: HydromancerClient) -> None:
+    respx.post(API).mock(return_value=httpx.Response(401, text="bad key"))
+    with pytest.raises(HydromancerError, match="refused the API key"):
+        await CoinResolver(client).resolve("eth")

@@ -168,6 +168,47 @@ async def test_redirects_are_not_followed(client: HydromancerClient) -> None:
     assert other.call_count == 0
 
 
+@respx.mock
+async def test_key_is_masked_even_when_cut_by_truncation(client: HydromancerClient) -> None:
+    # Put the key across the 300-character detail boundary.
+    body = "x" * (300 - 10) + TEST_KEY
+    respx.post(API).mock(return_value=httpx.Response(400, text=body))
+    with pytest.raises(HydromancerError) as exc:
+        await client.info({"type": "meta"})
+    assert TEST_KEY[:10] not in str(exc.value)
+
+
+@respx.mock
+async def test_bearer_tokens_are_masked(client: HydromancerClient) -> None:
+    respx.post(API).mock(return_value=httpx.Response(400, text="echo: Authorization: Bearer someOtherToken123"))
+    with pytest.raises(HydromancerError) as exc:
+        await client.info({"type": "meta"})
+    assert "someOtherToken123" not in str(exc.value) and "Bearer ***" in str(exc.value)
+
+
+@respx.mock
+async def test_oversized_response_is_refused() -> None:
+    small = HydromancerClient(api_key=TEST_KEY, max_response_bytes=1000)
+    respx.post(API).mock(return_value=httpx.Response(200, json={"blob": "x" * 5000}))
+    with pytest.raises(HydromancerError, match="larger than"):
+        await small.info({"type": "vaultSummaries"})
+
+
+@respx.mock
+async def test_429_jitter_stays_within_ceiling(client: HydromancerClient, sleeps: list[float]) -> None:
+    respx.post(API).mock(side_effect=[httpx.Response(429, headers={"Retry-After": "10"}), httpx.Response(200, json={})])
+    await client.info({"type": "meta"})
+    assert sleeps == [10.0]
+
+
+@respx.mock
+async def test_429_without_hints_backs_off(client: HydromancerClient, sleeps: list[float]) -> None:
+    respx.post(API).mock(return_value=httpx.Response(429, text="slow down"))
+    with pytest.raises(HydromancerError, match="about 4s"):
+        await client.info({"type": "meta"})
+    assert [round(s) for s in sleeps] == [1, 2]
+
+
 def test_repr_hides_key(client: HydromancerClient) -> None:
     assert TEST_KEY not in repr(client)
 
@@ -200,6 +241,8 @@ def test_base_url_allowed(raw: Any, expected: str) -> None:
         "https://api.hydromancer.xyz:8443/info",
         "https://api.hydromancer.xyz/other",
         "https://api.hydromancer.xyz/info?x=1",
+        "https://api.hydromancer.xyz:notaport/info",
+        "https://api.hydromancer.xyz:99999/info",
     ],
 )
 def test_base_url_refused(raw: str) -> None:
