@@ -1,0 +1,57 @@
+name: hydromancer-mcp
+title: Hydromancer MCP
+version: "0.1.0" # keep in step with src/hydromancer_mcp/__init__.py (a test checks this)
+summary: Read-only MCP server for the Hydromancer Hyperliquid API
+description: |
+  Maintained by the Hydromancer team. You need a Hydromancer API key to use it.
+
+  A read-only Model Context Protocol (MCP) server that lets AI apps such as
+  Claude Desktop, Claude Code, Cursor and Codex answer questions about
+  Hyperliquid wallets, top traders, markets, funding and liquidations, using
+  the Hydromancer API.
+
+  - 12 read-only tools: wallets, trades, top traders, markets, funding,
+    order book depth, liquidations, your API usage and a raw request tool
+  - Friendly inputs: coin names in any case ($ETH, ETH-PERP, xyz:tsla) and
+    times such as 24h, 7d or 2026-10-01
+  - It cannot place, cancel or sign orders and never handles funds or keys
+
+  The server speaks MCP over stdio and reads HYDROMANCER_API_KEY from its
+  environment. It contacts only api.hydromancer.xyz (or
+  api-testnet.hydromancer.xyz if HYDROMANCER_BASE_URL is set to it), sends the
+  key nowhere else and never logs it. API responses are returned to the AI as
+  data, never as instructions.
+
+  Example (Claude Code):
+    claude mcp add hydromancer -e HYDROMANCER_API_KEY=YOUR_KEY -- hydromancer-mcp
+license: MIT
+website: https://hydromancer.xyz
+source-code: https://github.com/hydromancerxyz/hydromancer-mcp-python # placeholder: confirm before the first release
+issues: https://github.com/hydromancerxyz/hydromancer-mcp-python/issues # placeholder: confirm before the first release
+contact: https://hydromancer.xyz # placeholder: confirm a support email or page before the first release
+icon: snap/gui/hydromancer-mcp.png
+
+base: core24
+grade: stable
+confinement: strict
+
+platforms:
+  amd64:
+  arm64:
+
+apps:
+  hydromancer-mcp:
+    command: bin/hydromancer-mcp
+    plugs:
+      - network
+    environment:
+      # The snap is read-only; don't try to write .pyc files at runtime.
+      PYTHONDONTWRITEBYTECODE: "1"
+
+parts:
+  hydromancer-mcp:
+    plugin: python
+    source: .
+    source-type: local
+    stage-packages:
+      - python3-venv

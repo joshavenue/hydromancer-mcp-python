@@ -300,3 +300,16 @@ async def test_closed_trades_median_even_and_cap_note(server: Any) -> None:
 async def test_non_finite_time_is_rejected(server: Any) -> None:
     is_error, text = await call(server, "hydromancer_funding_history", {"coin": "BTC", "since": 1e300})
     assert is_error and "Could not understand the time" in text
+
+
+def test_snap_version_matches_package() -> None:
+    import re
+    from pathlib import Path
+
+    from hydromancer_mcp import __version__
+
+    snap = Path(__file__).resolve().parent.parent / "snap" / "snapcraft.yaml"
+    if not snap.exists():
+        pytest.skip("snapcraft.yaml is not shipped in this distribution")
+    match = re.search(r'^version:\s*"([^"]+)"', snap.read_text(), re.MULTILINE)
+    assert match and match.group(1) == __version__
